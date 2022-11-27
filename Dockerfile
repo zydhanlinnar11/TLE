@@ -1,17 +1,19 @@
-FROM python:3.9.15-bullseye
-USER root
+FROM python:3.9.15-bullseye as poetry
 WORKDIR /TLE
-
-RUN apt-get update
-RUN apt-get install -y git apt-utils sqlite3
-RUN DEBIAN_FRONTEND="noninteractive" apt-get install -y libcairo2-dev libgirepository1.0-dev libpango1.0-dev pkg-config python3-dev gir1.2-pango-1.0 libjpeg-dev zlib1g-dev
-RUN pip install poetry
-
+ENV POETRY_HOME=/opt/poetry
+ENV POETRY_VIRTUALENVS_IN_PROJECT=true
+ENV PATH="$POETRY_HOME/bin:$PATH"
+RUN DEBIAN_FRONTEND="noninteractive" apt-get update && \
+    apt-get install -y libcairo2-dev libgirepository1.0-dev \
+    libpango1.0-dev pkg-config python3-dev gir1.2-pango-1.0 libjpeg-dev zlib1g-dev && \
+    pip install poetry
 COPY ./poetry.lock ./poetry.lock
 COPY ./pyproject.toml ./pyproject.toml
+RUN poetry install --no-interaction --no-ansi -vvv
 
-RUN python3 -m poetry install
+FROM python:3.9.15-slim-bullseye as runtime
+COPY --from=poetry /TLE/.venv /TLE/.venv
+ENV PATH="/TLE/.venv/bin:$PATH"
+COPY . /TLE
 
-COPY . .
-
-ENTRYPOINT ["/TLE/run.sh"]
+ENTRYPOINT ["bash", "/TLE/run-docker.sh"]
